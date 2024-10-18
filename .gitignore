@@ -1,0 +1,17 @@
+# Arquivos de compilação
+*.o
+*.exe
+*.bin
+
+# Diretórios de dependências
+node_modules/
+vendor/
+build/
+
+# Configurações locais
+.env
+*.log
+
+# Configurações de IDEs
+.idea/
+.vscode/
