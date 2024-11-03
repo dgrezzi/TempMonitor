@@ -1,14 +1,17 @@
 #!/bin/bash
 
 # Defina variáveis
-PROJECT_DIR="/opt/sensor_data_api" # Substitua pelo caminho real do seu projeto
-SERVICE_NAME="sensor_data_api.service"
+PROJECT_DIR="/caminho/para/seu/projeto" # Substitua pelo caminho real do seu projeto
+SERVICE_NAME="fastapi.service"
 USER="$(whoami)"
+MAIN_FILE="main.py" # Nome do arquivo que será copiado
 
-# 1. Criar o diretório do projeto se não existir
+# 1. Criar o diretório do projeto como superusuário
 if [ ! -d "$PROJECT_DIR" ]; then
     echo "Criando diretório do projeto em $PROJECT_DIR"
-    mkdir -p "$PROJECT_DIR"
+    sudo mkdir -p "$PROJECT_DIR"
+    # Transfere a propriedade do diretório para o usuário ativo
+    sudo chown -R "$USER:$USER" "$PROJECT_DIR"
 fi
 
 # 2. Instalar Python e pip se não estiverem instalados
@@ -30,7 +33,16 @@ EOL
 
 chmod +x "$PROJECT_DIR/start_app.sh"
 
-# 6. Criar arquivo de serviço do systemd
+# 6. Copiar o arquivo main.py para o diretório do projeto
+if [ -f "$MAIN_FILE" ]; then
+    cp "$MAIN_FILE" "$PROJECT_DIR/"
+    echo "Arquivo $MAIN_FILE copiado para $PROJECT_DIR."
+else
+    echo "Arquivo $MAIN_FILE não encontrado. Certifique-se de que ele esteja no diretório atual."
+    exit 1
+fi
+
+# 7. Criar arquivo de serviço do systemd
 cat <<EOL | sudo tee /etc/systemd/system/$SERVICE_NAME
 [Unit]
 Description=FastAPI Application
@@ -46,12 +58,12 @@ Restart=always
 WantedBy=multi-user.target
 EOL
 
-# 7. Recarregar systemd, habilitar e iniciar o serviço
+# 8. Recarregar systemd, habilitar e iniciar o serviço
 sudo systemctl daemon-reload
 sudo systemctl enable $SERVICE_NAME
 sudo systemctl start $SERVICE_NAME
 
-# 8. Verificar status do serviço
+# 9. Verificar status do serviço
 sudo systemctl status $SERVICE_NAME
 
 echo "Configuração concluída! Acesse o aplicativo em http://<seu-ip>:8000"
