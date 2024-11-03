@@ -9,7 +9,7 @@ vendor/
 build/
 
 # Configurações locais
-.env
+*.env
 *.log
 
 # Configurações de IDEs
