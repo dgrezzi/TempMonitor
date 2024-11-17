@@ -1,34 +1,48 @@
 #include <WiFi.h>
-#include <SD.h>
 
 // Credenciais Wi-Fi
-const char* ssid = "SEU_SSID";
-const char* password = "SUA_SENHA";
+const char* ssid = "XXXXX";  // Substitua pelo seu SSID
+const char* password = "XXXXX";         // Substitua pela sua senha
 
 // Pinos para os sensores LM35
-const int lm35Pins[] = {A0, A1, A2, A3, A4}; // Pinos dos sensores
-const int controlPins[] = {5, 6, 7, 8, 9};   // Pinos de controle
-const int numSensors = sizeof(lm35Pins) / sizeof(lm35Pins[0]); // Número de sensores
+const int lm35Pins[] = { 36, 39, 34, 35, 32 };                  // Pinos analógicos do ESP32
+const int controlPins[] = { 5, 18, 19, 21, 22 };                // Pinos de controle
+const int numSensors = sizeof(lm35Pins) / sizeof(lm35Pins[0]);  // Número de sensores
 
 // Configurações do servidor
-const char* server = "192.168.0.100"; // IP do servidor
+const char* server = "192.168.1.3";  // IP do servidor
 const int serverPort = 8000;
 
-WiFiClient client; // Cliente Wi-Fi
+WiFiClient client;  // Cliente Wi-Fi
 
 // Variáveis
 unsigned long previousMillis = 0;
-long interval = 60; // Intervalo em segundos (padrão de 60 segundos)
+long interval = 60;  // Intervalo em segundos (padrão de 60 segundos)
 
 // Função para conectar ao Wi-Fi
 void connectWiFi() {
   Serial.print("Conectando ao Wi-Fi: ");
   Serial.println(ssid);
 
+  // Configuração em modo Station (Cliente)
+  WiFi.mode(WIFI_STA);
+  WiFi.setTxPower(WIFI_POWER_11dBm); // Define a potência de transmissão
+
+  // Iniciar a conexão Wi-Fi
   WiFi.begin(ssid, password);
+
+  int attempt = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.print(".");
+
+    // Verificar o status da conexão a cada tentativa
+    if (attempt > 30) {
+      Serial.println("\nFalha ao conectar. Status do Wi-Fi: ");
+      Serial.println(WiFi.status());  // Exibe o status do Wi-Fi
+      return;
+    }
+    attempt++;
   }
 
   Serial.println("\nWi-Fi conectado!");
@@ -52,12 +66,11 @@ void setup() {
 // Função para ler temperatura dos sensores LM35
 void readTemperatures(float* temps) {
   for (int i = 0; i < numSensors; i++) {
-    // Verifica se o pino de controle está LOW (jumper conectado)
     if (digitalRead(controlPins[i]) == LOW) {
-      int sensorValue = analogRead(lm35Pins[i]);
-      temps[i] = sensorValue * (5000.0 / 1023.0) / 10.0; // Converte para Celsius
+      int milliVolts = analogReadMilliVolts(lm35Pins[i]);
+      temps[i] = milliVolts / 10.0;  // Conversão direta para °C
     } else {
-      temps[i] = NAN; // Define como não disponível (sensor desconectado)
+      temps[i] = NAN;
     }
   }
 }
@@ -65,13 +78,13 @@ void readTemperatures(float* temps) {
 // Função para enviar os dados para o servidor
 void sendData(float* temps) {
   if (client.connect(server, serverPort)) {
-    Serial.println("Conectado ao servidor!");
+    Serial.print("Conectado! ");
 
     String data = "{";
     bool first = true;
 
     for (int i = 0; i < numSensors; i++) {
-      if (!isnan(temps[i])) { // Apenas adiciona sensores conectados
+      if (!isnan(temps[i])) {  // Apenas adiciona sensores conectados
         if (!first) data += ", ";
         data += "\"sensor_" + String(i + 1) + "\": " + String(temps[i], 1);
         first = false;
@@ -101,10 +114,10 @@ void loop() {
   if (currentMillis - previousMillis >= (interval * 1000)) {
     previousMillis = currentMillis;
 
-    float temperatures[numSensors]; // Usando uma variável local
+    float temperatures[numSensors];  // Usando uma variável local
     readTemperatures(temperatures);
     sendData(temperatures);
   }
 
-  delay(500);
+  delay(100);  // Delay curto para alimentar o watchdog e evitar resets
 }
